@@ -48,15 +48,24 @@ Untuk menjalankan skrip ini, Anda memerlukan Python 3.
     ```
     *(Pastikan Anda memiliki perintah `traceroute` (Linux/macOS) atau `tracert` (Windows) di sistem Anda agar fitur traceroute berfungsi).*
 
+4.  **(Linux & macOS):**
+    Agar Anda bisa menjalankan `redconfig` dari direktori mana pun tanpa `python3`, ikuti langkah berikut:
+
+    ```bash
+    chmod +x redconfig.py
+    sudo ln -s "$(pwd)/redconfig.py" /usr/local/bin/redconfig
+    ```
+    Setelah ini, Anda dapat menjalankan alat dari direktori manapun hanya dengan perintah `redconfig`.
+
 ## Cara Penggunaan
 
 Gunakan perintah `-h` atau `--help` untuk melihat semua opsi yang tersedia.
 
 ```bash
-python3 redconfig.py -h
+redconfig -h
 ```
 ```
-usage: redconfig.py [-h] [--ports <PORTS>] [-w <FILE>] [-t <NUM>] [--timeout <SECONDS>] TARGET
+usage: redconfig [-h] [--ports <PORTS>] [-w <FILE>] [-t <NUM>] [--timeout <SECONDS>] TARGET
 
 red config - Laravel Configuration Exposure & Security Scanner
 
@@ -86,22 +95,22 @@ Example: python3 redconfig.py [https://example.com](https://example.com) --ports
 
 -   **Pemindaian dasar:**
     ```bash
-    python3 redconfig.py https://target-website.com
+    redconfig https://target-website.com
     ```
 
 -   **Pemindaian dengan 100 port terpopuler:**
     ```bash
-    python3 redconfig.py https://target-website.com --ports top-100
+    redconfig https://target-website.com --ports top-100
     ```
 
 -   **Pemindaian menggunakan wordlist kustom:**
     ```bash
-    python3 redconfig.py https://target-website.com -w common-paths.txt
+    redconfig https://target-website.com -w common-paths.txt
     ```
 
 -   **Pemindaian komprehensif dengan 20 threads:**
     ```bash
-    python3 redconfig.py https://target-website.com --ports 1-1024 -w /usr/share/wordlists/dirb/common.txt -t 20
+    redconfig https://target-website.com --ports 1-1024 -w /usr/share/wordlists/dirb/common.txt -t 20
     ```
 
 ## Disclaimer
