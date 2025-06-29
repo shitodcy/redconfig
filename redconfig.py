@@ -67,8 +67,7 @@ class LaravelAuditor:
             self.session = requests.Session()
             self.session.headers.update({'User-Agent': 'red-config-scanner/1.0'})
             self.session.verify = False
-            # MODIFIKASI: Menambahkan 'Discovered Subdomains' ke dalam stats
-            self.stats = {'Target': self.base_url, 'Scan Mode': 'Remote', 'Server IP': 'N/A', 'Hosting Provider': 'N/A', 'OS': 'N/A', 'HTTP Version': 'N/A', 'Web Server': 'N/A', 'WAF Detected': 'None', 'Discovered Subdomains': [], 'Laravel Version': 'Unknown', 'Open Ports': [], 'SSL Info': {}}
+            self.stats = {'Target': self.base_url, 'Scan Mode': 'Remote', 'Server IP': 'N/A', 'Hosting Provider': 'N/A', 'OS': 'N/A', 'HTTP Version': 'N/A', 'Web Server': 'N/A', 'WAF Detected': 'None', 'Laravel Version': 'Unknown', 'Open Ports': [], 'SSL Info': {}}
         else:
             self.stats = {'Target': target, 'Scan Mode': 'Local (SAST)', 'Laravel Version': 'Unknown', 'Discovered Routes': []}
 
@@ -175,7 +174,6 @@ class LaravelAuditor:
         except requests.RequestException:
             self._update_status(msg, "Error", TColors.ERROR, is_final=True)
     
-    # MODIFIKASI: Fungsi ini sekarang menyimpan hasil, bukan mencetaknya
     def _discover_subdomains(self):
         self._print_header("Phase 1.2: Subdomain Discovery")
         msg = "Searching for subdomains"
@@ -192,14 +190,13 @@ class LaravelAuditor:
                     if name_value:
                         names = name_value.split('\n')
                         for name in names:
-                            if name.strip() and '*' not in name:
+                            if name.strip() and '*' not in name and name.strip() != self.domain_name:
                                 subdomains.add(name.strip())
-            
-            # Menyimpan hasil ke dalam stats
-            self.stats['Discovered Subdomains'] = sorted(list(subdomains))
             
             if subdomains:
                 self._update_status(msg, f"Found {len(subdomains)} subdomains", is_final=True)
+                for sub in sorted(list(subdomains)):
+                    self._add_finding("INFO", "Subdomain Found", sub, "Informational: Review this subdomain for security misconfigurations.")
             else:
                 self._update_status(msg, "No subdomains found", is_final=True)
 
@@ -222,8 +219,6 @@ class LaravelAuditor:
         ports_to_scan = self.ports_to_scan or COMMON_PORTS.keys()
         port_dict = {p: COMMON_PORTS.get(p, 'Unknown') for p in ports_to_scan}
         port_dict.update({p: 'Top-100' for p in ports_to_scan if p in TOP_100_PORTS and p not in COMMON_PORTS})
-
-
         msg = f"Scanning {len(ports_to_scan)} specified ports"
         open_ports = []
         with ThreadPoolExecutor(max_workers=self.max_threads) as executor:
@@ -232,7 +227,6 @@ class LaravelAuditor:
                 port, is_open = future.result()
                 if is_open: open_ports.append(f"{port}/{port_dict.get(port, 'Custom')}")
                 self._update_status(msg, f"Scanning {i}/{len(ports_to_scan)}")
-        
         self.stats['Open Ports'] = open_ports or ['None detected']
         self._update_status(msg, "Done", is_final=True)
 
@@ -259,10 +253,10 @@ class LaravelAuditor:
             meta_token = re.search(r'<meta\s+name=["\']csrf-token["\']\s+content=["\'](.*?)["\']', r.text)
             input_token = re.search(r'<input\s+type=["\']hidden["\']\s+name=["\']_token["\']\s+value=["\'](.*?)["\']', r.text)
             if meta_token or input_token:
-                self._add_finding("INFO", "CSRF Token Detected", "Good security practice. Found in page source.")
+                self._add_finding("INFO", "CSRF Token Detected", "Good security practice. Found in page source.", "N/A")
                 self._update_status(msg, "Detected", TColors.SUCCESS, is_final=True)
             else:
-                self._add_finding("MEDIUM", "CSRF Token Not Found", "State-changing forms might be vulnerable. Manual check required.")
+                self._add_finding("MEDIUM", "CSRF Token Not Found", "State-changing forms might be vulnerable. Manual check required.", "Implement CSRF protection on all state-changing forms.")
                 self._update_status(msg, "Not Found", TColors.HIGH, is_final=True)
         except requests.RequestException:
             self._update_status(msg, "Error", TColors.ERROR, is_final=True)
@@ -298,9 +292,7 @@ class LaravelAuditor:
         print("-" * 60)
         
         for key, value in self.stats.items():
-            # MODIFIKASI: Subdomain akan dicetak secara khusus nanti
-            if key in ['Discovered Routes', 'Discovered Subdomains']:
-                continue
+            if key == 'Discovered Routes': continue
             
             if key == 'SSL Info':
                 if not value or 'Issuer' not in value:
@@ -314,13 +306,6 @@ class LaravelAuditor:
                 value_str = ", ".join(value) if isinstance(value, list) else str(value)
                 print(f"  {key.ljust(25)}: {TColors.SUCCESS}{value_str}{TColors.RESET}")
         
-        # MODIFIKASI: Mencetak daftar subdomain di sini
-        if self.stats.get('Discovered Subdomains'):
-            subdomains = self.stats['Discovered Subdomains']
-            print(f"  {'Discovered Subdomains'.ljust(25)}: {TColors.SUCCESS}{len(subdomains)} Found{TColors.RESET}")
-            for sub in subdomains:
-                print(f"    {TColors.SUCCESS}L_ {sub}{TColors.RESET}")
-
         print("-" * 60)
         
         if not self.findings: print(f"\n{TColors.SUCCESS}[✓] Audit complete. No common misconfigurations were found.{TColors.RESET}")
@@ -328,7 +313,7 @@ class LaravelAuditor:
             print(f"\n{TColors.CRITICAL}[!] FOUND {len(self.findings)} POTENTIAL SECURITY ISSUES:{TColors.RESET}")
             for finding in sorted(self.findings, key=lambda x: ['KRITIS', 'TINGGI', 'MEDIUM', 'INFO'].index(x['risk'])):
                 color = {"KRITIS": TColors.CRITICAL, "TINGGI": TColors.HIGH, "MEDIUM": TColors.MEDIUM, "INFO": TColors.INFO}.get(finding['risk'])
-                print(f"  {color}[{finding['risk'].ljust(7)}] {finding['description'].ljust(40)}{TColors.TARGET}{finding['location']}{TColors.RESET}")
+                print(f"  {color}[{finding['risk'].ljust(7)}] {finding['description'].ljust(25)}{TColors.TARGET}{finding['location']}{TColors.RESET}")
 
     def save_reports_interactively(self):
         if not self.findings and self.scan_mode == 'remote' and not self.stats.get('Open Ports'): return
@@ -419,6 +404,7 @@ def main():
     )
     print(banner)
     print(f"Hello: {TColors.TARGET}{socket.gethostname()}{TColors.RESET}")
+    print(f"Scan Target: {TColors.TARGET}{args.target}{TColors.RESET}")
     
     ports_to_scan = parse_ports(args.ports)
 
