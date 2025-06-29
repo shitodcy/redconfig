@@ -361,7 +361,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="red config - Laravel Configuration Exposure & Security Scanner",
         formatter_class=argparse.RawTextHelpFormatter,
-        epilog="Example: python3 redconfig.py https://example.com --ports top-100 -w /path/to/wordlist.txt"
+        epilog="Example: redconfig https://example.com --ports top-100 -w /path/to/wordlist.txt"
     )
     target_group = parser.add_argument_group('Target Specification')
     target_group.add_argument("target", metavar="TARGET", help="The root URL of the web application to be scanned (e.g., https://example.com).")
